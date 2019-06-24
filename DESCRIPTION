@@ -13,3 +13,9 @@ Depends:
     R (>= 3.1)
 Encoding: UTF-8
 LazyData: true
+Imports: 
+    dplyr,
+    stringr,
+    magrittr,
+    readr
+RoxygenNote: 6.1.1
