@@ -1,6 +1,20 @@
 library(tidyverse)
 library(RODBC)
+
+# install.packages(
+#   "l:/data store/data science team/r/packages/geoframework_0.1.0.tar.gz",
+#   repos = NULL,
+#   type="source")
+#
+# - OR -
+#
+# library(devtools)
+# devtools::install_github(repo = 'johnaclouse/geoframework')
+
 library(geoframework)
+
+
+
 
 message("Docker must have access to c:/temp")
 message("This script will create temporary files in c:/temp")
@@ -10,19 +24,24 @@ provider_path <- "c:/temp/geocode_providers/"
 
 con <- odbcConnect("ADW")
 
+remove_employees<- function(addresses){
+  addresses %>%
+    filter(!str_detect(tolower(street_address), pattern = "emp addr"))
+}
+
 clean_addresses <- function(addresses){
   addresses %>%
-    filter(!str_detect(tolower(street_address), pattern = "ods emp addr")) %>%
+    mutate_if(is.character, iconv, "latin1", "ASCII", sub = "") %>%
     mutate(zip = gsub("*", "", zip, fixed = T))
 }
 
 add_fields <- function(addresses) {
   addresses %>%
-    mutate(zip3 = substr(zip, 1, 3),
+    mutate(zip5 = substr("zip", 1, 5),
            address = paste0(str_trim(street_address), " ",
                             str_trim(city), ", ",
                             str_trim(state), " ",
-                            zip))
+                            zip5))
 }
 
 
@@ -34,13 +53,14 @@ sql_command_members <- "SELECT distinct
                   City as city,
                   State as state,
                   Zip as zip
-                FROM Members_Table"
+                FROM Membs_Demo"
 
 address_components <- sqlQuery(con,
                                sql_command_members,
                                stringsAsFactors = FALSE)
 
-addresses <- clean_addresses(address_components)
+addresses <- remove_employees(address_components)
+addresses <- clean_addresses(addresses)
 addresses <- add_fields(addresses)
 export_sequence_files(addresses, file_path = member_path)
 
@@ -53,7 +73,7 @@ sql_command_providers <- "SELECT DISTINCT
                   City as city,
                   State as state,
                   Zip as zip
-                FROM Providers_Table
+                FROM Provider_Address
                 WHERE Provider_Address_Type <> 'BIL'
                   AND Address_Line_1 <> ''
                   AND State IN ('OR', 'WA', 'AK')"
@@ -81,3 +101,7 @@ odbcCloseAll()
 
 # with census and deprivation index
 # docker run --rm=TRUE -v c:/temp/geocode:/tmp degauss/cchmc_batch_geocoder 1a.csv
+
+# DOS batch file
+# for /f %a IN ('dir /b /s "c:\temp\geocode\*.csv"') do echo docker run --rm=TRUE -v c:/temp/geocode:/tmp degauss/geocoder %a full_address
+# for /f %a IN ('dir /b /s "c:\temp\geocode\*.csv"') do call docker run --rm=TRUE -v c:/temp/geocode:/tmp degauss/geocoder %a full_address

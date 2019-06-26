@@ -38,10 +38,36 @@ geocoded_provider_addresses <- geocoded_provider_files %>%
   reduce(rbind)
 
 geocoded_addresses <- rbind(geocoded_member_addresses,
+                            
                             geocoded_provider_addresses) %>% 
+  filter(!is.na(city),
+         !is.na(state),
+         !is.na(zip)) %>% 
+  mutate_if(is.character, iconv, "latin1", "ASCII", sub = "") %>%
+  mutate(is_precise_geocode = ifelse(is.na(precise_geocode), F, precise_geocode),
+         zip5 = substr(zip, 1, 5)) %>% 
+  select(address,
+         street_address,
+         city,
+         state,
+         zip5,
+         zip3,
+         is_bad_address = bad_address,
+         is_PO_box = PO,
+         is_precise_geocode,
+         precision,
+         score,
+         fips_tract_id,
+         lon,
+         lat) %>% 
   distinct()
+
+cat("Column character widths:")
+View(as_tibble(map(geocoded_addresses, function(x) max(nchar(as.character(x)), na.rm = T))))
+            
 
 write_csv(geocoded_addresses, 
           na = "",
           path = output_path)
+
 
